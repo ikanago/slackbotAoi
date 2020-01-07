@@ -2,7 +2,6 @@ package slackbotAoi
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/nlopes/slack"
 	"io/ioutil"
 	"log"
@@ -37,45 +36,34 @@ func SendTweet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isAuthor, _ := regexp.MatchString("70_pocky", tweet.UserName)
-	isReTweet, _ := regexp.MatchString("RT", tweet.Text)
-	isDesiredTweet, _ := regexp.MatchString("創作2コマ漫画", tweet.Text)
-	if isAuthor && !isReTweet && isDesiredTweet {
-		client := slack.New(verificationToken)
-		_, _, err = client.PostMessage("CBHMC8KF0", slack.MsgOptionText(tweet.LinkToTweet, false))
+	if tweet.isMatchTweet("70_pocky", "創作2コマ漫画") {
+		err := postMessage("C9DTMB6GZ", tweet.LinkToTweet)
 		if err != nil {
 			log.Printf("error: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		fmt.Fprint(w, "success")
-	}
-}
-
-func HelloCommand(w http.ResponseWriter, r *http.Request) {
-	s, err := slack.SlashCommandParse(r)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	if !s.ValidateToken(verificationToken) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	switch s.Command {
-	case "/hello":
-		params := &slack.Msg{ResponseType: "in_channel", Text: "Hello, <@" + s.UserID + ">"}
-		b, err := json.Marshal(params)
+	} else if tweet.isMatchTweet("yuukikikuchi", "100日後に死ぬワニ") {
+		err := postMessage("C9DTMB6GZ", tweet.LinkToTweet)
 		if err != nil {
+			log.Printf("error: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(b)
-	default:
-		w.WriteHeader(http.StatusInternalServerError)
-		return
 	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// Check `tweet` satisfies a certain requirements.
+func (tweet *Tweet) isMatchTweet(author string, content string) bool {
+	isAuthor, _ := regexp.MatchString(author, tweet.UserName)
+	isReTweet, _ := regexp.MatchString("RT", tweet.Text)
+	isDesiredTweet, _ := regexp.MatchString(content, tweet.Text)
+	return isAuthor && !isReTweet && isDesiredTweet
+}
+
+func postMessage(channel string, message string) error {
+	client := slack.New(verificationToken)
+	_, _, err := client.PostMessage(channel, slack.MsgOptionText(message, false))
+	return err
 }
